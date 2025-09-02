@@ -1,21 +1,21 @@
-'use client'
+"use client";
 
-import { useState, useRef, useCallback } from 'react'
-import { Button } from './button'
-import { Card } from './card'
-import { cn } from '@/lib/utils'
-import { Upload, X, Camera, Loader2, Check } from 'lucide-react'
-import Image from 'next/image'
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Button } from "./button";
+import { Card } from "./card";
+import { cn } from "@/lib/utils";
+import { Upload, X, Camera, Loader2, Check } from "lucide-react";
+import Image from "next/image";
 
 interface ImageUploadProps {
-  value?: string
-  onChange: (url: string | null) => void
-  onUpload?: (file: File) => Promise<string | null>
-  className?: string
-  placeholder?: string
-  aspectRatio?: 'square' | 'banner' | 'auto'
-  maxSize?: number // in MB
-  disabled?: boolean
+  value?: string;
+  onChange: (url: string | null) => void;
+  onUpload?: (file: File) => Promise<string | null>;
+  className?: string;
+  placeholder?: string;
+  aspectRatio?: "square" | "banner" | "auto";
+  maxSize?: number; // in MB
+  disabled?: boolean;
 }
 
 export function ImageUpload({
@@ -23,179 +23,281 @@ export function ImageUpload({
   onChange,
   onUpload,
   className,
-  placeholder = 'Upload image',
-  aspectRatio = 'square',
+  placeholder = "Upload image",
+  aspectRatio = "square",
   maxSize = 5,
-  disabled = false
+  disabled = false,
 }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
-  const [showCamera, setShowCamera] = useState(false)
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const getAspectRatioClass = () => {
     switch (aspectRatio) {
-      case 'square':
-        return 'aspect-square'
-      case 'banner':
-        return 'aspect-[3/1]'
+      case "square":
+        return "aspect-square";
+      case "banner":
+        return "aspect-[3/1]";
       default:
-        return ''
+        return "";
     }
-  }
+  };
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    if (!onUpload) return
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      if (!onUpload) return;
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a valid image file (JPEG, PNG, or WebP)')
-      return
-    }
-
-    // Validate file size
-    const maxSizeBytes = maxSize * 1024 * 1024
-    if (file.size > maxSizeBytes) {
-      alert(`Image size must be less than ${maxSize}MB`)
-      return
-    }
-
-    setIsUploading(true)
-    try {
-      const url = await onUpload(file)
-      if (url) {
-        onChange(url)
+      // Validate file type
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        alert("Please upload a valid image file (JPEG, PNG, or WebP)");
+        return;
       }
-    } catch (error) {
-      console.error('Upload failed:', error)
-      alert('Upload failed. Please try again.')
-    } finally {
-      setIsUploading(false)
-    }
-  }, [onUpload, onChange, maxSize])
+
+      // Validate file size
+      const maxSizeBytes = maxSize * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        alert(`Image size must be less than ${maxSize}MB`);
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      try {
+        // Simulate progress for user feedback
+        const progressInterval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return 90;
+            }
+            return prev + 10;
+          });
+        }, 200);
+
+        const url = await onUpload(file);
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        if (url) {
+          onChange(url);
+        }
+
+        // Reset progress after a short delay
+        setTimeout(() => {
+          setUploadProgress(0);
+        }, 1000);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        alert("Upload failed. Please try again.");
+        setUploadProgress(0);
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [onUpload, onChange, maxSize]
+  );
 
   const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
     }
-  }, [])
+  }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
 
-    if (disabled || !e.dataTransfer.files?.[0]) return
-    
-    handleFileSelect(e.dataTransfer.files[0])
-  }, [disabled, handleFileSelect])
+      if (disabled || !e.dataTransfer.files?.[0]) return;
+
+      handleFileSelect(e.dataTransfer.files[0]);
+    },
+    [disabled, handleFileSelect]
+  );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled || !e.target.files?.[0]) return
-    handleFileSelect(e.target.files[0])
-  }
+    if (disabled || !e.target.files?.[0]) return;
+    handleFileSelect(e.target.files[0]);
+  };
 
   const handleRemove = () => {
-    onChange(null)
-  }
+    onChange(null);
+  };
 
   const openFileDialog = () => {
-    if (disabled) return
-    fileInputRef.current?.click()
-  }
+    if (disabled) return;
+    fileInputRef.current?.click();
+  };
 
   // Camera functionality
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
-        }
-      })
-      setCameraStream(stream)
-      setShowCamera(true)
-      
-      // Set video stream
+      setCameraError(null);
+      setShowCamera(true); // Show modal first
+
+      console.log("Requesting camera access...");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+      console.log("Camera stream obtained:", stream.getTracks());
+
+      // Wait a bit for the modal to render
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       if (videoRef.current) {
-        videoRef.current.srcObject = stream
+        console.log("Setting video source...");
+        videoRef.current.srcObject = stream;
+
+        // Play the video explicitly
+        try {
+          await videoRef.current.play();
+          console.log("Video playing");
+        } catch (playError) {
+          console.error("Error playing video:", playError);
+        }
       }
+
+      setCameraStream(stream);
+      console.log("Camera setup complete");
     } catch (error) {
-      console.error('Error accessing camera:', error)
-      alert('Unable to access camera. Please check permissions and try again.')
+      console.error("Error accessing camera:", error);
+      setCameraError(
+        "Unable to access camera. Please check permissions and try again."
+      );
+
+      // Clean up stream if it was created
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+      }
     }
-  }, [])
+  }, [cameraStream]);
 
   const stopCamera = useCallback(() => {
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop())
-      setCameraStream(null)
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
     }
-    setShowCamera(false)
-    setCapturedImage(null)
-  }, [cameraStream])
+    setShowCamera(false);
+    setCapturedImage(null);
+    setCameraError(null);
+
+    // Clean up video element
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, [cameraStream]);
 
   const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
+    console.log("Capture photo clicked");
 
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-    
-    if (!context) return
+    if (!videoRef.current || !canvasRef.current) {
+      console.error("Video or canvas ref not available");
+      alert("Camera not ready. Please try again.");
+      return;
+    }
 
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
 
-    // Draw video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    if (!context) {
+      console.error("Cannot get canvas context");
+      alert("Canvas not available. Please try again.");
+      return;
+    }
 
-    // Get image data
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9)
-    setCapturedImage(imageDataUrl)
-  }, [])
+    // Simple check - just see if video has dimensions
+    const width = video.videoWidth || video.clientWidth || 640;
+    const height = video.videoHeight || video.clientHeight || 480;
+
+    console.log("Capturing photo with dimensions:", width, "x", height);
+
+    // Set canvas dimensions
+    canvas.width = width;
+    canvas.height = height;
+
+    try {
+      // Draw video frame to canvas
+      context.drawImage(video, 0, 0, width, height);
+
+      // Get image data
+      const imageDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      console.log(
+        "Image captured successfully, data URL length:",
+        imageDataUrl.length
+      );
+
+      if (imageDataUrl && imageDataUrl !== "data:,") {
+        setCapturedImage(imageDataUrl);
+      } else {
+        console.error("Failed to capture image data");
+        alert("Failed to capture image. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error capturing image:", error);
+      alert("Failed to capture image. Please try again.");
+    }
+  }, []);
 
   const useCapturedPhoto = useCallback(async () => {
-    if (!capturedImage) return
+    if (!capturedImage) return;
 
     try {
       // Convert data URL to blob
-      const response = await fetch(capturedImage)
-      const blob = await response.blob()
-      
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
+
       // Create file from blob
       const file = new File([blob], `camera-capture-${Date.now()}.jpg`, {
-        type: 'image/jpeg'
-      })
+        type: "image/jpeg",
+      });
 
       // Stop camera and close modal
-      stopCamera()
+      stopCamera();
 
       // Upload the captured image
-      await handleFileSelect(file)
+      await handleFileSelect(file);
     } catch (error) {
-      console.error('Error processing captured image:', error)
-      alert('Failed to process captured image. Please try again.')
+      console.error("Error processing captured image:", error);
+      alert("Failed to process captured image. Please try again.");
     }
-  }, [capturedImage, stopCamera, handleFileSelect])
+  }, [capturedImage, stopCamera, handleFileSelect]);
 
   const retryCameraCapture = useCallback(() => {
-    setCapturedImage(null)
-  }, [])
+    setCapturedImage(null);
+  }, []);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn("relative", className)}>
       <input
         ref={fileInputRef}
         type="file"
@@ -204,14 +306,14 @@ export function ImageUpload({
         className="hidden"
         disabled={disabled}
       />
-      
+
       <Card
         className={cn(
-          'relative overflow-hidden border-2 border-dashed transition-colors',
+          "relative overflow-hidden border-2 border-dashed transition-colors",
           getAspectRatioClass(),
-          dragActive && 'border-primary bg-primary/5',
-          disabled && 'opacity-50 cursor-not-allowed',
-          !disabled && 'cursor-pointer hover:border-primary/50'
+          dragActive && "border-primary bg-primary/5",
+          disabled && "opacity-50 cursor-not-allowed",
+          !disabled && "cursor-pointer hover:border-primary/50"
         )}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -234,8 +336,8 @@ export function ImageUpload({
                   size="sm"
                   variant="secondary"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    openFileDialog()
+                    e.stopPropagation();
+                    openFileDialog();
                   }}
                   disabled={disabled}
                   title="Upload from files"
@@ -246,8 +348,8 @@ export function ImageUpload({
                   size="sm"
                   variant="secondary"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    startCamera()
+                    e.stopPropagation();
+                    startCamera();
                   }}
                   disabled={disabled}
                   title="Take photo with camera"
@@ -258,8 +360,8 @@ export function ImageUpload({
                   size="sm"
                   variant="destructive"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    handleRemove()
+                    e.stopPropagation();
+                    handleRemove();
                   }}
                   disabled={disabled}
                   title="Remove image"
@@ -274,7 +376,19 @@ export function ImageUpload({
             {isUploading ? (
               <>
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Uploading...</p>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Uploading...
+                </p>
+                {/* Progress Bar */}
+                <div className="w-full max-w-xs bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {uploadProgress}%
+                </p>
               </>
             ) : (
               <>
@@ -288,8 +402,8 @@ export function ImageUpload({
                     size="sm"
                     variant="outline"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      startCamera()
+                      e.stopPropagation();
+                      startCamera();
                     }}
                     disabled={disabled}
                     className="text-xs"
@@ -324,9 +438,18 @@ export function ImageUpload({
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-4">
-              {capturedImage ? (
+              {cameraError ? (
+                <div className="space-y-4">
+                  <div className="text-center p-8">
+                    <p className="text-red-600 mb-4">{cameraError}</p>
+                    <Button onClick={startCamera} variant="outline">
+                      Try Again
+                    </Button>
+                  </div>
+                </div>
+              ) : capturedImage ? (
                 <div className="space-y-4">
                   <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
                     <Image
@@ -362,6 +485,19 @@ export function ImageUpload({
                       )}
                     </Button>
                   </div>
+                  {isUploading && (
+                    <div className="space-y-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        {uploadProgress}%
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -370,9 +506,34 @@ export function ImageUpload({
                       ref={videoRef}
                       autoPlay
                       playsInline
+                      controls
                       muted
                       className="w-full h-full object-cover"
+                      onLoadedMetadata={() => {
+                        console.log("Video metadata loaded");
+                      }}
+                      onCanPlay={() => {
+                        console.log("Video can play");
+                        videoRef.current
+                          ?.play()
+                          .catch((err) =>
+                            console.error("Autoplay blocked", err)
+                          );
+                      }}
                     />
+                    {!cameraStream && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">
+                            Starting camera...
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Please allow camera access
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-center">
                     <Button
@@ -384,7 +545,9 @@ export function ImageUpload({
                     </Button>
                   </div>
                   <p className="text-sm text-gray-600 text-center">
-                    Position yourself in the frame and click the camera button to take a photo
+                    {cameraStream
+                      ? "Click the camera button to take a photo"
+                      : "Starting camera... Please allow camera access when prompted"}
                   </p>
                 </div>
               )}
@@ -396,5 +559,5 @@ export function ImageUpload({
       {/* Hidden canvas for image capture */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
-  )
+  );
 }

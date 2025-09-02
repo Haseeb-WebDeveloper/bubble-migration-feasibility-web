@@ -15,24 +15,42 @@ export default function DashboardPage() {
 
   // Load user profile
   useEffect(() => {
+    let isMounted = true
+    
     async function loadProfile() {
-      if (!user) return
+      if (!user?.id) {
+        if (isMounted) setIsLoading(false)
+        return
+      }
+      
+      // Only load if we don't have a profile or it's for a different user
+      if (profile?.userId === user.id) {
+        if (isMounted) setIsLoading(false)
+        return
+      }
       
       try {
+        console.log('Loading profile for user:', user.id)
         const response = await fetch(`/api/profile/${user.id}`)
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const profileData = await response.json()
           setProfile(profileData)
         }
       } catch (error) {
         console.error('Error loading profile:', error)
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     loadProfile()
-  }, [user])
+    
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id]) // Only depend on user.id, not the whole profile object
 
   return (
     <div className="space-y-8">

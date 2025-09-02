@@ -45,13 +45,21 @@ export default function SettingsPage() {
 
   // Load user profile
   useEffect(() => {
+    let isMounted = true
+    
     async function loadProfile() {
-      if (!user) return
+      if (!user?.id) return
+      
+      // Only load if we don't have a profile or it's for a different user
+      if (profile?.userId === user.id) {
+        return
+      }
       
       setIsLoading(true)
       try {
+        console.log('Loading profile for settings:', user.id)
         const response = await fetch(`/api/profile/${user.id}`)
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const profileData = await response.json()
           setProfile(profileData)
           setProfileImage(profileData.profileImage)
@@ -65,12 +73,18 @@ export default function SettingsPage() {
       } catch (error) {
         console.error('Error loading profile:', error)
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     loadProfile()
-  }, [user, form])
+    
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, form]) // Simplified dependencies
 
   // Handle image uploads
   const handleImageUpload = async (file: File, type: 'profile' | 'banner'): Promise<string | null> => {
@@ -193,7 +207,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <ImageUpload
-              value={profileImage}
+              value={profileImage || undefined}
               onChange={(url) => setProfileImage(url)}
               onUpload={(file) => handleImageUpload(file, 'profile')}
               aspectRatio="square"
@@ -215,7 +229,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <ImageUpload
-              value={bannerImage}
+              value={bannerImage || undefined}
               onChange={(url) => setBannerImage(url)}
               onUpload={(file) => handleImageUpload(file, 'banner')}
               aspectRatio="banner"
