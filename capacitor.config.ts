@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MyNextMobileApp',
   webDir: 'out', // can be empty if you’re using hosted server
   server: {
-    url: 'https://your-deployed-next-app.vercel.app',
+    url: 'https:///bubble-migration-feasibility-web.vercel.app',
     cleartext: true,
   },
 };
